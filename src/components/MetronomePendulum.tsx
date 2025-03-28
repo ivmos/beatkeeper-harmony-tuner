@@ -31,11 +31,11 @@ const MetronomePendulum: React.FC<MetronomePendulumProps> = ({ isPlaying, bpm, c
 
   return (
     <div className="w-full h-full flex justify-center items-start">
-      <div className="relative w-6 h-full">
+      <div className="relative w-6 h-48">
         {/* Pendulum arm */}
         <div 
           ref={pendulumRef}
-          className="pendulum-arm absolute top-0 left-1/2 w-1 h-56 bg-gradient-to-b from-metro-purple to-metro-light-purple rounded-full"
+          className="pendulum-arm absolute top-0 left-1/2 w-1 h-48 bg-gradient-to-b from-metro-purple to-metro-light-purple rounded-full"
           style={{ transform: 'translateX(-50%)' }}
         >
           {/* Pendulum weight */}
