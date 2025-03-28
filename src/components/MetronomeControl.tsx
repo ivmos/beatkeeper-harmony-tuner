@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -138,11 +137,11 @@ const MetronomeControl: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto">
-      <div className="w-full h-60 relative mb-4">
+      <div className="w-full h-72 relative mb-8">
         <MetronomePendulum isPlaying={isPlaying} bpm={bpm} currentBeat={currentBeat} />
       </div>
       
-      <div className="text-7xl font-bold mb-6 flex items-center">
+      <div className="text-7xl font-bold mb-8 flex items-center">
         <input
           type="number"
           value={bpm}
