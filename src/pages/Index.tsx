@@ -1,12 +1,21 @@
-// Update this page (the content is just a fallback if you fail to update the page)
 
-const Index = () => {
+import React from 'react';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import MetronomeControl from '@/components/MetronomeControl';
+
+const Index: React.FC = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-metro-dark-blue to-black">
+      <Header />
+      
+      <main className="flex-1 flex justify-center items-center p-4">
+        <div className="w-full max-w-xl bg-secondary/20 backdrop-blur-sm p-6 rounded-xl shadow-xl border border-metro-purple/20">
+          <MetronomeControl />
+        </div>
+      </main>
+      
+      <Footer />
     </div>
   );
 };
