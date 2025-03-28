@@ -1,9 +1,9 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
 import MetronomePendulum from './MetronomePendulum';
 import TapTempo from './TapTempo';
 
@@ -142,12 +142,12 @@ const MetronomeControl: React.FC = () => {
         <MetronomePendulum isPlaying={isPlaying} bpm={bpm} currentBeat={currentBeat} />
       </div>
       
-      <div className="text-7xl font-bold mb-8 flex items-center">
-        <input
+      <div className="text-7xl font-bold mb-8 flex items-center justify-center">
+        <Input
           type="number"
           value={bpm}
           onChange={handleBpmInput}
-          className="w-32 bg-transparent text-center focus:outline-none focus:ring-2 focus:ring-metro-purple rounded-md"
+          className="w-40 text-7xl h-20 bg-transparent text-center focus:outline-none focus:ring-2 focus:ring-metro-purple rounded-md font-bold p-2"
           min={30}
           max={250}
         />
