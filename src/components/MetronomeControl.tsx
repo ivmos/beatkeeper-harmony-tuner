@@ -1,11 +1,13 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import MetronomePendulum from './MetronomePendulum';
 import TapTempo from './TapTempo';
+import MetronomeStats from './MetronomeStats';
+import { startSession, endCurrentSession } from '@/utils/statsUtils';
 
 const MetronomeControl: React.FC = () => {
   const [bpm, setBpm] = useState(100);
@@ -15,6 +17,25 @@ const MetronomeControl: React.FC = () => {
   const audioContext = useRef<AudioContext | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
   const { toast } = useToast();
+
+  // Track session stats when the component mounts/unmounts
+  useEffect(() => {
+    // Cleanup function runs when component unmounts
+    return () => {
+      if (isPlaying) {
+        endCurrentSession();
+      }
+    };
+  }, []);
+
+  // Monitor isPlaying state for stats tracking
+  useEffect(() => {
+    if (isPlaying) {
+      startSession();
+    } else {
+      endCurrentSession();
+    }
+  }, [isPlaying]);
 
   // Initialize audio context on first user interaction
   const initAudio = () => {
@@ -138,6 +159,10 @@ const MetronomeControl: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto">
+      <div className="w-full flex justify-end mb-2">
+        <MetronomeStats />
+      </div>
+      
       <div className="w-full h-72 flex items-center justify-center mb-6">
         <MetronomePendulum isPlaying={isPlaying} bpm={bpm} currentBeat={currentBeat} />
       </div>
