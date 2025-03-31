@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 
 interface MetronomePendulumProps {
   isPlaying: boolean;
@@ -8,49 +8,49 @@ interface MetronomePendulumProps {
 }
 
 const MetronomePendulum: React.FC<MetronomePendulumProps> = ({ isPlaying, bpm, currentBeat }) => {
-  const pendulumRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!pendulumRef.current) return;
-    
-    const pendulum = pendulumRef.current;
-    
-    if (isPlaying) {
-      // Calculate duration from BPM (one complete swing takes two beats)
-      const durationInSeconds = (60 / bpm) * 2;
-      
-      // Reset any existing animation
-      pendulum.style.animation = 'none';
-      
-      // Force a reflow (repaint) to ensure the animation restarts properly
-      void pendulum.offsetWidth;
-      
-      // Apply animation with dynamic duration
-      pendulum.style.animation = `pendulum-swing-right ${durationInSeconds}s ease-in-out infinite`;
-    } else {
-      // Stop animation when not playing
-      pendulum.style.animation = 'none';
-      pendulum.style.transform = 'rotate(0deg)';
-    }
-  }, [isPlaying, bpm]);
-
+  // Calculate animation duration from BPM
+  const beatDuration = 60 / bpm;
+  
   return (
-    <div className="w-full h-full flex justify-center items-start">
-      <div className="relative w-6 h-full">
-        {/* Pendulum arm */}
+    <div className="w-full h-full flex justify-center items-center">
+      <div className="relative w-32 h-32 flex items-center justify-center">
+        {/* Beat indicator circle */}
         <div 
-          ref={pendulumRef}
-          className="pendulum-arm absolute top-0 left-1/2 w-1 h-56 bg-gradient-to-b from-metro-purple to-metro-light-purple rounded-full"
-          style={{ transformOrigin: 'top center', transform: 'translateX(-50%)' }}
+          className={`w-32 h-32 rounded-full flex items-center justify-center transition-all duration-100
+            ${isPlaying && currentBeat === 0 ? 'bg-metro-purple scale-110' : 'bg-metro-dark-blue border-2 border-metro-purple'}
+          `}
         >
-          {/* Pendulum weight */}
-          <div className="absolute bottom-0 left-1/2 w-12 h-12 rounded-full bg-metro-purple transform -translate-x-1/2 flex items-center justify-center shadow-lg">
-            <div className="w-6 h-6 rounded-full bg-white opacity-30"></div>
+          <div 
+            className={`w-24 h-24 rounded-full flex items-center justify-center 
+              ${isPlaying && currentBeat === 0 ? 'bg-metro-light-purple' : 'bg-metro-dark-blue border border-metro-light-purple'}
+            `}
+          >
+            <div 
+              className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold
+                ${isPlaying ? 'text-white' : 'text-muted-foreground'}
+              `}
+            >
+              {Math.round(bpm)}
+            </div>
           </div>
         </div>
         
-        {/* Center pin */}
-        <div className="absolute top-0 left-1/2 w-6 h-6 bg-metro-light-purple rounded-full transform -translate-x-1/2 z-10 shadow-md"></div>
+        {/* Beat indicators */}
+        <div className="absolute w-full h-full">
+          {[0, 1, 2, 3].map((beat) => (
+            <div 
+              key={beat}
+              className={`absolute w-4 h-4 rounded-full 
+                ${isPlaying && currentBeat === beat ? 'bg-metro-purple animate-beat-pulse' : 'bg-muted'}
+              `}
+              style={{ 
+                top: beat === 0 ? '-8px' : beat === 2 ? 'calc(100% - 8px)' : '50%',
+                left: beat === 3 ? '-8px' : beat === 1 ? 'calc(100% - 8px)' : '50%',
+                transform: 'translate(-50%, -50%)'
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

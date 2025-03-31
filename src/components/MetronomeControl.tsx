@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -137,20 +138,8 @@ const MetronomeControl: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto">
-      <div className="w-full h-72 relative mb-8">
+      <div className="w-full h-72 flex items-center justify-center mb-6">
         <MetronomePendulum isPlaying={isPlaying} bpm={bpm} currentBeat={currentBeat} />
-      </div>
-      
-      <div className="text-7xl font-bold mb-8 flex items-center">
-        <input
-          type="number"
-          value={bpm}
-          onChange={handleBpmInput}
-          className="w-32 bg-transparent text-center focus:outline-none focus:ring-2 focus:ring-metro-purple rounded-md"
-          min={30}
-          max={250}
-        />
-        <span className="text-2xl text-muted-foreground ml-2">BPM</span>
       </div>
       
       <div className="w-full mb-8">
@@ -179,13 +168,6 @@ const MetronomeControl: React.FC = () => {
         </Button>
         
         <TapTempo updateBpm={updateBpmFromTap} />
-      </div>
-      
-      <div className="flex gap-4 text-white text-sm">
-        <div className={`w-4 h-4 rounded-full ${currentBeat === 0 && isPlaying ? 'bg-metro-purple animate-beat-pulse' : 'bg-muted'}`}></div>
-        <div className={`w-4 h-4 rounded-full ${currentBeat === 1 && isPlaying ? 'bg-metro-purple animate-beat-pulse' : 'bg-muted'}`}></div>
-        <div className={`w-4 h-4 rounded-full ${currentBeat === 2 && isPlaying ? 'bg-metro-purple animate-beat-pulse' : 'bg-muted'}`}></div>
-        <div className={`w-4 h-4 rounded-full ${currentBeat === 3 && isPlaying ? 'bg-metro-purple animate-beat-pulse' : 'bg-muted'}`}></div>
       </div>
     </div>
   );
