@@ -19,9 +19,14 @@ const MetronomePendulum: React.FC<MetronomePendulumProps> = ({ isPlaying, bpm, c
       // Calculate duration from BPM (one complete swing takes two beats)
       const durationInSeconds = (60 / bpm) * 2;
       
+      // Reset any existing animation
+      pendulum.style.animation = 'none';
+      
+      // Force a reflow (repaint) to ensure the animation restarts properly
+      void pendulum.offsetWidth;
+      
       // Apply animation with dynamic duration
       pendulum.style.animation = `pendulum-swing-right ${durationInSeconds}s ease-in-out infinite`;
-      pendulum.style.animationDuration = `${durationInSeconds}s`;
     } else {
       // Stop animation when not playing
       pendulum.style.animation = 'none';
@@ -36,7 +41,7 @@ const MetronomePendulum: React.FC<MetronomePendulumProps> = ({ isPlaying, bpm, c
         <div 
           ref={pendulumRef}
           className="pendulum-arm absolute top-0 left-1/2 w-1 h-56 bg-gradient-to-b from-metro-purple to-metro-light-purple rounded-full"
-          style={{ transform: 'translateX(-50%)' }}
+          style={{ transformOrigin: 'top center', transform: 'translateX(-50%)' }}
         >
           {/* Pendulum weight */}
           <div className="absolute bottom-0 left-1/2 w-12 h-12 rounded-full bg-metro-purple transform -translate-x-1/2 flex items-center justify-center shadow-lg">
