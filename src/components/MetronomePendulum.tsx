@@ -35,19 +35,21 @@ const MetronomePendulum: React.FC<MetronomePendulumProps> = ({ isPlaying, bpm, c
           </div>
         </div>
         
-        {/* Beat indicators positioned precisely on circle */}
+        {/* Beat indicators positioned outside the circle, tangentially */}
         <div className="absolute w-full h-full pointer-events-none">
           {[0, 1, 2, 3].map((beat) => {
             // Calculate position based on circle geometry
             const angle = (beat * Math.PI / 2) - (Math.PI / 2); // Start from top, go clockwise
-            const radius = 23; // Distance from center of container to dot center
-            const xPos = Math.cos(angle) * radius;
-            const yPos = Math.sin(angle) * radius;
+            const radius = 26; // Distance from center to outer edge of main circle (20px radius + a bit more)
+            const dotOffset = 10; // How far outside the circle the dots should be
+            const totalDistance = radius + dotOffset;
+            const xPos = Math.cos(angle) * totalDistance;
+            const yPos = Math.sin(angle) * totalDistance;
             
             return (
               <div 
                 key={beat}
-                className={`absolute w-4 h-4 rounded-full transform -translate-x-1/2 -translate-y-1/2
+                className={`absolute w-5 h-5 rounded-full transform -translate-x-1/2 -translate-y-1/2
                   ${isPlaying && currentBeat === beat ? 'bg-metro-purple animate-beat-pulse' : 'bg-muted'}
                 `}
                 style={{ 
