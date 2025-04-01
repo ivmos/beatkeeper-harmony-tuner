@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -8,6 +7,7 @@ import MetronomePendulum from './MetronomePendulum';
 import TapTempo from './TapTempo';
 import MetronomeStats from './MetronomeStats';
 import VolumeControl from './VolumeControl';
+import SoundSelector from './SoundSelector';
 import { startSession, endCurrentSession } from '@/utils/statsUtils';
 
 const MetronomeControl: React.FC = () => {
@@ -16,6 +16,7 @@ const MetronomeControl: React.FC = () => {
   const [currentBeat, setCurrentBeat] = useState(0);
   const [volume, setVolume] = useState(0.5); // Default volume at 50%
   const [isMuted, setIsMuted] = useState(false);
+  const [soundType, setSoundType] = useState('sine'); // Default sound type
   const intervalRef = useRef<number | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -74,6 +75,9 @@ const MetronomeControl: React.FC = () => {
     
     // Connect the note's gain node to the main gain node
     noteGain.connect(gainNodeRef.current);
+    
+    // Set the oscillator type based on user selection
+    oscillator.type = soundType as OscillatorType;
     
     // Use different frequencies for accented beats
     oscillator.frequency.value = currentBeat === 0 ? 1000 : 800;
@@ -190,6 +194,15 @@ const MetronomeControl: React.FC = () => {
     }
   };
 
+  // Handle sound type change
+  const handleSoundTypeChange = (value: string) => {
+    setSoundType(value);
+    toast({
+      title: "Sound Changed",
+      description: `Sound type set to ${value}`,
+    });
+  };
+
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto">
       <div className="w-full flex justify-end mb-2">
@@ -228,12 +241,19 @@ const MetronomeControl: React.FC = () => {
         <TapTempo updateBpm={updateBpmFromTap} />
       </div>
 
-      <VolumeControl 
-        volume={volume} 
-        isMuted={isMuted}
-        onVolumeChange={handleVolumeChange}
-        onToggleMute={toggleMute} 
-      />
+      <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+        <SoundSelector 
+          currentSound={soundType}
+          onSoundChange={handleSoundTypeChange}
+        />
+        
+        <VolumeControl 
+          volume={volume} 
+          isMuted={isMuted}
+          onVolumeChange={handleVolumeChange}
+          onToggleMute={toggleMute} 
+        />
+      </div>
     </div>
   );
 };
