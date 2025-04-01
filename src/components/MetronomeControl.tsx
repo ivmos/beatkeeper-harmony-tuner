@@ -18,6 +18,7 @@ const MetronomeControl: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
@@ -40,10 +41,22 @@ const MetronomeControl: React.FC = () => {
     }
   }, [isPlaying]);
 
+  // Effect to update gain node when volume or mute state changes
+  useEffect(() => {
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted]);
+
   // Initialize audio context on first user interaction
   const initAudio = () => {
     if (!audioContext.current) {
       audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Create a main gain node that will control the volume
+      gainNodeRef.current = audioContext.current.createGain();
+      gainNodeRef.current.gain.value = isMuted ? 0 : volume;
+      gainNodeRef.current.connect(audioContext.current.destination);
     }
     return audioContext.current;
   };
@@ -51,21 +64,23 @@ const MetronomeControl: React.FC = () => {
   // Schedule a beat sound
   const scheduleNote = (time: number) => {
     const context = audioContext.current;
-    if (!context) return;
+    if (!context || !gainNodeRef.current) return;
     
     const oscillator = context.createOscillator();
-    const gainNode = context.createGain();
+    const noteGain = context.createGain();
     
-    oscillator.connect(gainNode);
-    gainNode.connect(context.destination);
+    // Connect oscillator to the note's gain node
+    oscillator.connect(noteGain);
+    
+    // Connect the note's gain node to the main gain node
+    noteGain.connect(gainNodeRef.current);
     
     // Use different frequencies for accented beats
     oscillator.frequency.value = currentBeat === 0 ? 1000 : 800;
     
-    // Apply volume (considering mute state)
-    const effectiveVolume = isMuted ? 0 : volume;
-    gainNode.gain.value = effectiveVolume;
-    gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    // This gain node controls the envelope of the individual note
+    noteGain.gain.value = 1;
+    noteGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
     
     oscillator.start(time);
     oscillator.stop(time + 0.05);
