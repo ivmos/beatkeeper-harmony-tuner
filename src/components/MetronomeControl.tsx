@@ -2,17 +2,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import MetronomePendulum from './MetronomePendulum';
 import TapTempo from './TapTempo';
 import MetronomeStats from './MetronomeStats';
+import VolumeControl from './VolumeControl';
 import { startSession, endCurrentSession } from '@/utils/statsUtils';
 
 const MetronomeControl: React.FC = () => {
   const [bpm, setBpm] = useState(100);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(0);
+  const [volume, setVolume] = useState(0.5); // Default volume at 50%
+  const [isMuted, setIsMuted] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
@@ -59,7 +62,9 @@ const MetronomeControl: React.FC = () => {
     // Use different frequencies for accented beats
     oscillator.frequency.value = currentBeat === 0 ? 1000 : 800;
     
-    gainNode.gain.value = 0.5;
+    // Apply volume (considering mute state)
+    const effectiveVolume = isMuted ? 0 : volume;
+    gainNode.gain.value = effectiveVolume;
     gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
     
     oscillator.start(time);
@@ -142,6 +147,19 @@ const MetronomeControl: React.FC = () => {
     }
   };
 
+  // Handle volume change
+  const handleVolumeChange = (value: number) => {
+    setVolume(value);
+    if (isMuted && value > 0) {
+      setIsMuted(false);
+    }
+  };
+
+  // Toggle mute
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+  };
+
   // Update BPM from tap tempo component
   const updateBpmFromTap = (newBpm: number) => {
     setBpm(newBpm);
@@ -194,6 +212,13 @@ const MetronomeControl: React.FC = () => {
         
         <TapTempo updateBpm={updateBpmFromTap} />
       </div>
+
+      <VolumeControl 
+        volume={volume} 
+        isMuted={isMuted}
+        onVolumeChange={handleVolumeChange}
+        onToggleMute={toggleMute} 
+      />
     </div>
   );
 };
