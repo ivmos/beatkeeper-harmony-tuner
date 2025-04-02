@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -201,6 +202,12 @@ const MetronomeControl: React.FC = () => {
       title: "Sound Changed",
       description: `Sound type set to ${value}`,
     });
+    
+    // If playing, apply the new sound type immediately
+    if (isPlaying) {
+      // No need to stop and restart the metronome - the next beat
+      // will automatically use the new sound type since we're updating state
+    }
   };
 
   return (
