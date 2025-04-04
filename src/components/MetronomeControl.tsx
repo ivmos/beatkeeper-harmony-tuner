@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Play, Pause } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import MetronomePendulum from './MetronomePendulum';
 import TapTempo from './TapTempo';
@@ -13,6 +14,7 @@ import { startSession, endCurrentSession } from '@/utils/statsUtils';
 
 const MetronomeControl: React.FC = () => {
   const [bpm, setBpm] = useState(100);
+  const [bpmInput, setBpmInput] = useState("100"); // New state for input field
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(0);
   const [volume, setVolume] = useState(0.5); // Default volume at 50%
@@ -141,10 +143,11 @@ const MetronomeControl: React.FC = () => {
     }
   };
 
-  // Handle BPM change
+  // Handle BPM change from slider
   const handleBpmChange = (value: number[]) => {
     const newBpm = value[0];
     setBpm(newBpm);
+    setBpmInput(newBpm.toString()); // Update input field when slider changes
     
     // If playing, restart to apply new tempo
     if (isPlaying) {
@@ -153,9 +156,12 @@ const MetronomeControl: React.FC = () => {
     }
   };
 
-  // Handle direct BPM input
-  const handleBpmInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newBpm = parseInt(e.target.value);
+  // Handle direct BPM input from keyboard
+  const handleBpmInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    setBpmInput(inputValue); // Always update input field
+    
+    const newBpm = parseInt(inputValue);
     if (!isNaN(newBpm) && newBpm >= 30 && newBpm <= 250) {
       setBpm(newBpm);
       
@@ -163,6 +169,42 @@ const MetronomeControl: React.FC = () => {
       if (isPlaying) {
         stopMetronome();
         startMetronome();
+      }
+    }
+  };
+
+  // Handle blur event for the input field
+  const handleBpmInputBlur = () => {
+    // Revert to valid BPM if input is invalid
+    if (bpmInput === '' || isNaN(parseInt(bpmInput)) || parseInt(bpmInput) < 30 || parseInt(bpmInput) > 250) {
+      setBpmInput(bpm.toString());
+      toast({
+        title: "Invalid BPM",
+        description: "BPM must be between 30 and 250",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle key press for the input field
+  const handleBpmInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const newBpm = parseInt(bpmInput);
+      if (!isNaN(newBpm) && newBpm >= 30 && newBpm <= 250) {
+        setBpm(newBpm);
+        
+        // If playing, restart to apply new tempo
+        if (isPlaying) {
+          stopMetronome();
+          startMetronome();
+        }
+      } else {
+        setBpmInput(bpm.toString());
+        toast({
+          title: "Invalid BPM",
+          description: "BPM must be between 30 and 250",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -183,6 +225,7 @@ const MetronomeControl: React.FC = () => {
   // Update BPM from tap tempo component
   const updateBpmFromTap = (newBpm: number) => {
     setBpm(newBpm);
+    setBpmInput(newBpm.toString()); // Update input field when tap tempo changes
     toast({
       title: "Tempo Updated",
       description: `BPM set to ${newBpm}`,
@@ -221,14 +264,25 @@ const MetronomeControl: React.FC = () => {
       </div>
       
       <div className="w-full mb-8">
-        <Slider
-          value={[bpm]}
-          min={30}
-          max={250}
-          step={1}
-          onValueChange={handleBpmChange}
-          className="w-full"
-        />
+        <div className="flex items-center gap-4 mb-4">
+          <Slider
+            value={[bpm]}
+            min={30}
+            max={250}
+            step={1}
+            onValueChange={handleBpmChange}
+            className="flex-1"
+          />
+          <Input
+            type="text"
+            value={bpmInput}
+            onChange={handleBpmInputChange}
+            onBlur={handleBpmInputBlur}
+            onKeyDown={handleBpmInputKeyPress}
+            className="w-20 text-center"
+            aria-label="BPM value"
+          />
+        </div>
         <div className="flex justify-between text-sm text-muted-foreground mt-1">
           <span>30</span>
           <span>Tempo</span>
