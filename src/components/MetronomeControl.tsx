@@ -12,19 +12,50 @@ import VolumeControl from './VolumeControl';
 import SoundSelector from './SoundSelector';
 import { startSession, endCurrentSession } from '@/utils/statsUtils';
 
+// Keys for localStorage
+const STORAGE_KEY_BPM = 'metronome-bpm';
+const STORAGE_KEY_VOLUME = 'metronome-volume';
+const STORAGE_KEY_SOUND = 'metronome-sound';
+
 const MetronomeControl: React.FC = () => {
-  const [bpm, setBpm] = useState(100);
-  const [bpmInput, setBpmInput] = useState("100"); // New state for input field
+  // Initialize state with values from localStorage or defaults
+  const [bpm, setBpm] = useState(() => {
+    const savedBpm = localStorage.getItem(STORAGE_KEY_BPM);
+    return savedBpm ? parseInt(savedBpm) : 100;
+  });
+  const [bpmInput, setBpmInput] = useState(() => {
+    const savedBpm = localStorage.getItem(STORAGE_KEY_BPM);
+    return savedBpm || "100";
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(0);
-  const [volume, setVolume] = useState(0.5); // Default volume at 50%
+  const [volume, setVolume] = useState(() => {
+    const savedVolume = localStorage.getItem(STORAGE_KEY_VOLUME);
+    return savedVolume ? parseFloat(savedVolume) : 0.5;
+  });
   const [isMuted, setIsMuted] = useState(false);
-  const [soundType, setSoundType] = useState('sine'); // Default sound type
+  const [soundType, setSoundType] = useState(() => {
+    const savedSound = localStorage.getItem(STORAGE_KEY_SOUND);
+    return savedSound || 'sine';
+  });
   const intervalRef = useRef<number | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
   const { toast } = useToast();
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_BPM, bpm.toString());
+  }, [bpm]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_VOLUME, volume.toString());
+  }, [volume]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SOUND, soundType);
+  }, [soundType]);
 
   // Track session stats when the component mounts/unmounts
   useEffect(() => {
