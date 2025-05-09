@@ -17,6 +17,14 @@ const STORAGE_KEY_BPM = 'metronome-bpm';
 const STORAGE_KEY_VOLUME = 'metronome-volume';
 const STORAGE_KEY_SOUND = 'metronome-sound';
 
+// Audio file for click sound
+const CLICK_SOUNDS = {
+  sine: "/sounds/sine-click.mp3",
+  square: "/sounds/square-click.mp3",
+  sawtooth: "/sounds/sawtooth-click.mp3",
+  triangle: "/sounds/triangle-click.mp3",
+};
+
 const MetronomeControl: React.FC = () => {
   // Initialize state with values from localStorage or defaults
   const [bpm, setBpm] = useState(() => {
@@ -42,6 +50,8 @@ const MetronomeControl: React.FC = () => {
   const audioContext = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const { toast } = useToast();
 
   // Save settings to localStorage whenever they change
@@ -59,13 +69,36 @@ const MetronomeControl: React.FC = () => {
 
   // Track session stats when the component mounts/unmounts
   useEffect(() => {
+    // Setup audio element for iOS background playback
+    audioElementRef.current = new Audio();
+    audioElementRef.current.src = CLICK_SOUNDS[soundType as keyof typeof CLICK_SOUNDS] || CLICK_SOUNDS.sine;
+    audioElementRef.current.loop = false;
+    audioElementRef.current.preload = "auto";
+    
+    // This is crucial for iOS background audio
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+    }
+    
     // Cleanup function runs when component unmounts
     return () => {
       if (isPlaying) {
         endCurrentSession();
       }
+      stopMetronome();
+      
+      if (audioContext.current) {
+        audioContext.current.close();
+      }
     };
   }, []);
+
+  // Update audio element source when sound type changes
+  useEffect(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.src = CLICK_SOUNDS[soundType as keyof typeof CLICK_SOUNDS] || CLICK_SOUNDS.sine;
+    }
+  }, [soundType]);
 
   // Monitor isPlaying state for stats tracking
   useEffect(() => {
@@ -86,45 +119,54 @@ const MetronomeControl: React.FC = () => {
   // Initialize audio context on first user interaction
   const initAudio = () => {
     if (!audioContext.current) {
+      // Create audio context
       audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       
-      // Create a main gain node that will control the volume
-      gainNodeRef.current = audioContext.current.createGain();
-      gainNodeRef.current.gain.value = isMuted ? 0 : volume;
-      gainNodeRef.current.connect(audioContext.current.destination);
+      // Connect audio element to the audio context for iOS background playback
+      if (audioElementRef.current && !sourceNodeRef.current) {
+        sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
+        
+        // Create gain node
+        gainNodeRef.current = audioContext.current.createGain();
+        gainNodeRef.current.gain.value = isMuted ? 0 : volume;
+        
+        // Connect the source to the gain node and then to the destination
+        sourceNodeRef.current.connect(gainNodeRef.current);
+        gainNodeRef.current.connect(audioContext.current.destination);
+      }
     }
+    
+    // Resume audio context if suspended (needed for iOS)
+    if (audioContext.current && audioContext.current.state === 'suspended') {
+      audioContext.current.resume();
+    }
+    
     return audioContext.current;
   };
 
   // Schedule a beat sound
   const scheduleNote = (time: number) => {
-    const context = audioContext.current;
-    if (!context || !gainNodeRef.current) return;
-    
-    const oscillator = context.createOscillator();
-    const noteGain = context.createGain();
-    
-    // Connect oscillator to the note's gain node
-    oscillator.connect(noteGain);
-    
-    // Connect the note's gain node to the main gain node
-    noteGain.connect(gainNodeRef.current);
-    
-    // Set the oscillator type based on user selection
-    oscillator.type = soundType as OscillatorType;
-    
-    // Use different frequencies for accented beats
-    oscillator.frequency.value = currentBeat === 0 ? 1000 : 800;
-    
-    // This gain node controls the envelope of the individual note
-    noteGain.gain.value = 1;
-    noteGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-    
-    oscillator.start(time);
-    oscillator.stop(time + 0.05);
-    
-    // Update beat counter
-    setCurrentBeat((prevBeat) => (prevBeat + 1) % 4);
+    if (audioElementRef.current) {
+      const currTime = audioContext.current?.currentTime || 0;
+      
+      // Play the audio element
+      audioElementRef.current.currentTime = 0;
+      audioElementRef.current.play().catch(err => {
+        console.error("Error playing audio:", err);
+        
+        // Try to handle browser autoplay policy
+        if (err.name === 'NotAllowedError') {
+          toast({
+            title: "Audio Playback Blocked",
+            description: "Please interact with the page to enable sound",
+            variant: "destructive",
+          });
+        }
+      });
+      
+      // Update beat counter
+      setCurrentBeat((prevBeat) => (prevBeat + 1) % 4);
+    }
   };
 
   // Calculate note timing and schedule
@@ -346,6 +388,9 @@ const MetronomeControl: React.FC = () => {
           onToggleMute={toggleMute} 
         />
       </div>
+      
+      {/* Hidden audio element for iOS background playback */}
+      <audio id="metronome-audio" preload="auto" style={{ display: 'none' }} />
     </div>
   );
 };
