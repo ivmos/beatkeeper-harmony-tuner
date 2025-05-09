@@ -1,6 +1,7 @@
 
 import { useRef, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import { CLICK_SOUNDS, SoundType } from '@/constants/audioConstants';
 
 export const useAudioContext = () => {
   const audioContext = useRef<AudioContext | null>(null);
@@ -19,10 +20,15 @@ export const useAudioContext = () => {
         gainNodeRef.current = audioContext.current.createGain();
         gainNodeRef.current.connect(audioContext.current.destination);
         
-        // Connect audio element to the audio context for iOS background playback
+        // Connect audio element to the audio context
         if (audioElementRef.current) {
-          sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
-          sourceNodeRef.current.connect(gainNodeRef.current);
+          try {
+            sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
+            sourceNodeRef.current.connect(gainNodeRef.current);
+          } catch (error) {
+            console.warn("Could not create media element source:", error);
+            // This might happen if the audio element is already connected
+          }
         }
       }
       
@@ -58,9 +64,15 @@ export const useAudioContext = () => {
   // Initialize audio element for iOS background playback
   useEffect(() => {
     if (!audioElementRef.current) {
+      // Create a new audio element
       audioElementRef.current = new Audio();
       audioElementRef.current.loop = false;
       audioElementRef.current.preload = "auto";
+      
+      // Set initial sound (default to sine)
+      audioElementRef.current.src = CLICK_SOUNDS['sine'];
+      
+      // Append to body for iOS background playback
       document.body.appendChild(audioElementRef.current);
     }
     
