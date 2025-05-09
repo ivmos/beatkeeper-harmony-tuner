@@ -1,20 +1,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-
-// Keys for localStorage
-const STORAGE_KEY_VOLUME = 'metronome-volume';
-const STORAGE_KEY_SOUND = 'metronome-sound';
-
-// Audio file for click sound
-const CLICK_SOUNDS = {
-  sine: "/sounds/sine-click.mp3",
-  square: "/sounds/square-click.mp3",
-  sawtooth: "/sounds/sawtooth-click.mp3",
-  triangle: "/sounds/triangle-click.mp3",
-};
-
-export type SoundType = 'sine' | 'square' | 'sawtooth' | 'triangle';
+import { useAudioContext } from '@/hooks/useAudioContext';
+import { useAudioVolume } from '@/hooks/useAudioVolume';
+import { useSoundType } from '@/hooks/useSoundType';
+import { SoundType } from '@/constants/audioConstants';
 
 export interface UseMetronomeAudioProps {
   bpm: number;
@@ -22,171 +12,32 @@ export interface UseMetronomeAudioProps {
 }
 
 export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) => {
-  // Initialize state with values from localStorage or defaults
-  const [volume, setVolume] = useState(() => {
-    const savedVolume = localStorage.getItem(STORAGE_KEY_VOLUME);
-    return savedVolume ? parseFloat(savedVolume) : 0.5;
-  });
-  const [isMuted, setIsMuted] = useState(false);
-  const [soundType, setSoundType] = useState<SoundType>(() => {
-    const savedSound = localStorage.getItem(STORAGE_KEY_SOUND);
-    return (savedSound as SoundType) || 'sine';
-  });
   const [currentBeat, setCurrentBeat] = useState(0);
   
   const intervalRef = useRef<number | null>(null);
-  const audioContext = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
-  const audioBufferRef = useRef<AudioBuffer | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const soundsLoadedRef = useRef<Record<SoundType, boolean>>({
-    sine: false,
-    square: false,
-    sawtooth: false,
-    triangle: false
-  });
   const { toast } = useToast();
 
-  // Save settings to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_VOLUME, volume.toString());
-  }, [volume]);
+  // Use our custom hooks
+  const {
+    audioContext,
+    gainNodeRef,
+    audioElementRef,
+    sourceNodeRef,
+    ensureAudioContext
+  } = useAudioContext();
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_SOUND, soundType);
-  }, [soundType]);
+  const {
+    volume,
+    isMuted,
+    handleVolumeChange,
+    toggleMute
+  } = useAudioVolume(gainNodeRef);
 
-  // Create audio element for iOS background playback
-  useEffect(() => {
-    if (!audioElementRef.current) {
-      audioElementRef.current = new Audio();
-      audioElementRef.current.loop = false;
-      audioElementRef.current.preload = "auto";
-      document.body.appendChild(audioElementRef.current);
-    }
-    
-    // Update the audio element source when sound type changes
-    if (audioElementRef.current) {
-      audioElementRef.current.src = CLICK_SOUNDS[soundType];
-      audioElementRef.current.load(); // Important to load the new source
-    }
-    
-    return () => {
-      stopMetronome();
-      
-      if (audioContext.current) {
-        audioContext.current.close();
-      }
-      
-      if (audioElementRef.current && audioElementRef.current.parentNode) {
-        document.body.removeChild(audioElementRef.current);
-      }
-    };
-  }, [soundType]);
-  
-  // Initialize audio context on component mount
-  useEffect(() => {
-    const initAudio = () => {
-      if (!audioContext.current) {
-        try {
-          // Create audio context
-          audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-          
-          // Create gain node
-          gainNodeRef.current = audioContext.current.createGain();
-          gainNodeRef.current.gain.value = isMuted ? 0 : volume;
-          gainNodeRef.current.connect(audioContext.current.destination);
-          
-          // Connect audio element to the audio context for iOS background playback
-          if (audioElementRef.current) {
-            sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
-            sourceNodeRef.current.connect(gainNodeRef.current);
-          }
-        } catch (error) {
-          console.error("Error initializing audio context:", error);
-          toast({
-            title: "Audio Error",
-            description: "Could not initialize audio system",
-            variant: "destructive",
-          });
-        }
-      }
-    };
-
-    // Initialize audio on first interaction
-    const handleFirstInteraction = () => {
-      initAudio();
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('touchstart', handleFirstInteraction);
-    };
-
-    document.addEventListener('click', handleFirstInteraction);
-    document.addEventListener('touchstart', handleFirstInteraction);
-
-    return () => {
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('touchstart', handleFirstInteraction);
-    };
-  }, []);
-
-  // Effect to update gain node when volume or mute state changes
-  useEffect(() => {
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = isMuted ? 0 : volume;
-    }
-  }, [volume, isMuted]);
-
-  // Resume audio context if needed
-  const ensureAudioContext = () => {
-    if (!audioContext.current) {
-      initAudio();
-      return false;
-    }
-    
-    if (audioContext.current.state === 'suspended') {
-      audioContext.current.resume();
-    }
-    
-    return true;
-  };
-
-  // Initialize audio context
-  const initAudio = () => {
-    try {
-      if (!audioContext.current) {
-        // Create audio context
-        audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        
-        // Create gain node
-        gainNodeRef.current = audioContext.current.createGain();
-        gainNodeRef.current.gain.value = isMuted ? 0 : volume;
-        gainNodeRef.current.connect(audioContext.current.destination);
-        
-        // Connect audio element to the audio context for iOS background playback
-        if (audioElementRef.current) {
-          sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
-          sourceNodeRef.current.connect(gainNodeRef.current);
-        }
-      }
-      
-      // Resume audio context if suspended (needed for iOS)
-      if (audioContext.current.state === 'suspended') {
-        audioContext.current.resume();
-      }
-      
-      return true;
-    } catch (error) {
-      console.error("Error initializing audio context:", error);
-      toast({
-        title: "Audio Error",
-        description: "Could not initialize audio system",
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
+  const {
+    soundType,
+    handleSoundTypeChange
+  } = useSoundType(audioElementRef);
 
   // Schedule a beat sound
   const scheduleNote = () => {
@@ -271,28 +122,6 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     setCurrentBeat(0);
   };
 
-  // Handle volume change
-  const handleVolumeChange = (value: number) => {
-    setVolume(value);
-    if (isMuted && value > 0) {
-      setIsMuted(false);
-    }
-  };
-
-  // Toggle mute
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-  };
-
-  // Handle sound type change
-  const handleSoundTypeChange = (value: string) => {
-    setSoundType(value as SoundType);
-    toast({
-      title: "Sound Changed",
-      description: `Sound type set to ${value}`,
-    });
-  };
-
   // Update the metronome when isPlaying changes
   useEffect(() => {
     if (isPlaying) {
@@ -318,4 +147,3 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     handleSoundTypeChange
   };
 };
-
