@@ -38,8 +38,15 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
   const audioContext = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const soundsLoadedRef = useRef<Record<SoundType, boolean>>({
+    sine: false,
+    square: false,
+    sawtooth: false,
+    triangle: false
+  });
   const { toast } = useToast();
 
   // Save settings to localStorage whenever they change
@@ -51,16 +58,19 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     localStorage.setItem(STORAGE_KEY_SOUND, soundType);
   }, [soundType]);
 
-  // Setup audio element for iOS background playback
+  // Create audio element for iOS background playback
   useEffect(() => {
-    audioElementRef.current = new Audio();
-    audioElementRef.current.src = CLICK_SOUNDS[soundType as keyof typeof CLICK_SOUNDS] || CLICK_SOUNDS.sine;
-    audioElementRef.current.loop = false;
-    audioElementRef.current.preload = "auto";
+    if (!audioElementRef.current) {
+      audioElementRef.current = new Audio();
+      audioElementRef.current.loop = false;
+      audioElementRef.current.preload = "auto";
+      document.body.appendChild(audioElementRef.current);
+    }
     
-    // This is crucial for iOS background audio
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = 'none';
+    // Update the audio element source when sound type changes
+    if (audioElementRef.current) {
+      audioElementRef.current.src = CLICK_SOUNDS[soundType];
+      audioElementRef.current.load(); // Important to load the new source
     }
     
     return () => {
@@ -69,15 +79,57 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
       if (audioContext.current) {
         audioContext.current.close();
       }
+      
+      if (audioElementRef.current && audioElementRef.current.parentNode) {
+        document.body.removeChild(audioElementRef.current);
+      }
+    };
+  }, [soundType]);
+  
+  // Initialize audio context on component mount
+  useEffect(() => {
+    const initAudio = () => {
+      if (!audioContext.current) {
+        try {
+          // Create audio context
+          audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          
+          // Create gain node
+          gainNodeRef.current = audioContext.current.createGain();
+          gainNodeRef.current.gain.value = isMuted ? 0 : volume;
+          gainNodeRef.current.connect(audioContext.current.destination);
+          
+          // Connect audio element to the audio context for iOS background playback
+          if (audioElementRef.current) {
+            sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
+            sourceNodeRef.current.connect(gainNodeRef.current);
+          }
+        } catch (error) {
+          console.error("Error initializing audio context:", error);
+          toast({
+            title: "Audio Error",
+            description: "Could not initialize audio system",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    // Initialize audio on first interaction
+    const handleFirstInteraction = () => {
+      initAudio();
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('touchstart', handleFirstInteraction);
+    };
+
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('touchstart', handleFirstInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('touchstart', handleFirstInteraction);
     };
   }, []);
-
-  // Update audio element source when sound type changes
-  useEffect(() => {
-    if (audioElementRef.current) {
-      audioElementRef.current.src = CLICK_SOUNDS[soundType as keyof typeof CLICK_SOUNDS] || CLICK_SOUNDS.sine;
-    }
-  }, [soundType]);
 
   // Effect to update gain node when volume or mute state changes
   useEffect(() => {
@@ -86,53 +138,83 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     }
   }, [volume, isMuted]);
 
-  // Initialize audio context on first user interaction
-  const initAudio = () => {
+  // Resume audio context if needed
+  const ensureAudioContext = () => {
     if (!audioContext.current) {
-      // Create audio context
-      audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      // Connect audio element to the audio context for iOS background playback
-      if (audioElementRef.current && !sourceNodeRef.current) {
-        sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
+      initAudio();
+      return false;
+    }
+    
+    if (audioContext.current.state === 'suspended') {
+      audioContext.current.resume();
+    }
+    
+    return true;
+  };
+
+  // Initialize audio context
+  const initAudio = () => {
+    try {
+      if (!audioContext.current) {
+        // Create audio context
+        audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         
         // Create gain node
         gainNodeRef.current = audioContext.current.createGain();
         gainNodeRef.current.gain.value = isMuted ? 0 : volume;
-        
-        // Connect the source to the gain node and then to the destination
-        sourceNodeRef.current.connect(gainNodeRef.current);
         gainNodeRef.current.connect(audioContext.current.destination);
+        
+        // Connect audio element to the audio context for iOS background playback
+        if (audioElementRef.current) {
+          sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
+          sourceNodeRef.current.connect(gainNodeRef.current);
+        }
       }
+      
+      // Resume audio context if suspended (needed for iOS)
+      if (audioContext.current.state === 'suspended') {
+        audioContext.current.resume();
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error initializing audio context:", error);
+      toast({
+        title: "Audio Error",
+        description: "Could not initialize audio system",
+        variant: "destructive",
+      });
+      return false;
     }
-    
-    // Resume audio context if suspended (needed for iOS)
-    if (audioContext.current && audioContext.current.state === 'suspended') {
-      audioContext.current.resume();
-    }
-    
-    return audioContext.current;
   };
 
   // Schedule a beat sound
-  const scheduleNote = (time: number) => {
-    if (audioElementRef.current) {
-      const currTime = audioContext.current?.currentTime || 0;
-      
+  const scheduleNote = () => {
+    if (audioElementRef.current && gainNodeRef.current) {
       // Play the audio element
       audioElementRef.current.currentTime = 0;
-      audioElementRef.current.play().catch(err => {
-        console.error("Error playing audio:", err);
-        
-        // Try to handle browser autoplay policy
-        if (err.name === 'NotAllowedError') {
-          toast({
-            title: "Audio Playback Blocked",
-            description: "Please interact with the page to enable sound",
-            variant: "destructive",
+      
+      // This promise-based approach handles autoplay restrictions better
+      const playPromise = audioElementRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // Playback started successfully
+          })
+          .catch(err => {
+            console.error("Error playing audio:", err);
+            
+            // Try to handle browser autoplay policy
+            if (err.name === 'NotAllowedError') {
+              toast({
+                title: "Audio Playback Blocked",
+                description: "Please interact with the page to enable sound",
+                variant: "destructive",
+              });
+            }
           });
-        }
-      });
+      }
       
       // Update beat counter
       setCurrentBeat((prevBeat) => (prevBeat + 1) % 4);
@@ -141,29 +223,43 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
 
   // Calculate note timing and schedule
   const scheduler = () => {
-    const context = audioContext.current;
-    if (!context) return;
+    if (!audioContext.current) return;
     
     const secondsPerBeat = 60.0 / bpm;
+    const currentTime = audioContext.current.currentTime;
     
-    while (nextNoteTimeRef.current < context.currentTime + 0.1) {
-      scheduleNote(nextNoteTimeRef.current);
-      nextNoteTimeRef.current += secondsPerBeat;
-    }
+    // Schedule this beat
+    scheduleNote();
+    
+    // Update next note time
+    nextNoteTimeRef.current = currentTime + secondsPerBeat;
   };
 
   // Start metronome loop
   const startMetronome = () => {
-    const context = initAudio();
-    nextNoteTimeRef.current = context.currentTime;
+    // Try to initialize audio context
+    if (!ensureAudioContext()) {
+      toast({
+        title: "Audio Error",
+        description: "Please interact with the page to enable sound",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Clear any existing interval
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
     }
     
-    // Start scheduler
-    intervalRef.current = window.setInterval(scheduler, 25);
+    // Calculate interval time in milliseconds
+    const intervalTime = (60.0 / bpm) * 1000;
+    
+    // Start scheduler with precise timing
+    intervalRef.current = window.setInterval(scheduler, intervalTime);
+    
+    // Trigger first beat immediately
+    scheduler();
   };
 
   // Stop metronome
@@ -204,6 +300,12 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     } else {
       stopMetronome();
     }
+    
+    return () => {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+      }
+    };
   }, [isPlaying, bpm]);
 
   return {
@@ -216,3 +318,4 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     handleSoundTypeChange
   };
 };
+
