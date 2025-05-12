@@ -14,6 +14,7 @@ export interface UseMetronomeAudioProps {
 export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) => {
   const [currentBeat, setCurrentBeat] = useState(0);
   const [audioReady, setAudioReady] = useState(false);
+  const [wasPlaying, setWasPlaying] = useState(false);
   
   const intervalRef = useRef<number | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
@@ -62,6 +63,36 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     };
   }, []);
 
+  // Handle visibility change (app suspension)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // App is suspended, store current playing state
+        setWasPlaying(isPlaying);
+        if (intervalRef.current) {
+          window.clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      } else if (document.visibilityState === 'visible') {
+        // App is resumed
+        // Ensure audio context is running
+        ensureAudioContext();
+        
+        // If it was playing before suspension, restart the metronome
+        if (wasPlaying && isPlaying) {
+          stopMetronome();
+          startMetronome();
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isPlaying, wasPlaying, bpm]);
+
   // Schedule a beat sound
   const scheduleNote = () => {
     if (!audioReady && !audioInitializedRef.current) {
@@ -84,6 +115,9 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
           console.error("Audio element has no source!");
           return;
         }
+        
+        // Ensure audio context is resumed (needed after suspension)
+        ensureAudioContext();
         
         // Directly create an oscillator for instant sound if needed
         if (audioContext.current && gainNodeRef.current) {

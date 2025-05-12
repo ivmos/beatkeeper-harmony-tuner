@@ -114,6 +114,14 @@ export const useAudioContext = () => {
       
       // Also try connecting when the audio can play through
       audioElementRef.current.addEventListener('canplaythrough', connectAudioSource);
+
+      // Handle iOS app suspension and resumption
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          console.log("App became visible, resuming audio context");
+          ensureAudioContext();
+        }
+      });
     }
     
     return () => {
