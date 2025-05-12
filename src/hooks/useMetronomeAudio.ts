@@ -13,6 +13,7 @@ export interface UseMetronomeAudioProps {
 
 export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) => {
   const [currentBeat, setCurrentBeat] = useState(0);
+  const [audioReady, setAudioReady] = useState(false);
   
   const intervalRef = useRef<number | null>(null);
   const nextNoteTimeRef = useRef<number>(0);
@@ -24,7 +25,8 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     gainNodeRef,
     audioElementRef,
     sourceNodeRef,
-    ensureAudioContext
+    ensureAudioContext,
+    audioInitializedRef
   } = useAudioContext();
 
   const {
@@ -39,8 +41,39 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
     handleSoundTypeChange
   } = useSoundType(audioElementRef);
 
+  // Add an event listener to initialize audio on user interaction
+  useEffect(() => {
+    const initAudioOnUserInteraction = () => {
+      ensureAudioContext();
+      setAudioReady(true);
+      
+      // Remove the event listeners once audio is initialized
+      document.removeEventListener('click', initAudioOnUserInteraction);
+      document.removeEventListener('touchstart', initAudioOnUserInteraction);
+    };
+    
+    // Add event listeners for initializing audio on user interaction
+    document.addEventListener('click', initAudioOnUserInteraction);
+    document.addEventListener('touchstart', initAudioOnUserInteraction);
+    
+    return () => {
+      document.removeEventListener('click', initAudioOnUserInteraction);
+      document.removeEventListener('touchstart', initAudioOnUserInteraction);
+    };
+  }, []);
+
   // Schedule a beat sound
   const scheduleNote = () => {
+    if (!audioReady && !audioInitializedRef.current) {
+      // Audio context not initialized yet, show message
+      toast({
+        title: "Audio not ready",
+        description: "Please interact with the page to enable sound",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (audioElementRef.current) {
       try {
         // Reset audio position to start
@@ -52,7 +85,7 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
           return;
         }
         
-        // Directly create an oscillator for instant sound if the audio element fails
+        // Directly create an oscillator for instant sound if needed
         if (audioContext.current && gainNodeRef.current) {
           const oscillator = audioContext.current.createOscillator();
           oscillator.type = soundType as OscillatorType;
@@ -67,23 +100,14 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
         const playPromise = audioElementRef.current.play();
         
         if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              // Playback started successfully
-              console.log("Audio played successfully");
-            })
-            .catch(err => {
-              console.error("Error playing audio:", err);
-              
-              // Try to handle browser autoplay policy
-              if (err.name === 'NotAllowedError') {
-                toast({
-                  title: "Audio Playback Blocked",
-                  description: "Please interact with the page to enable sound",
-                  variant: "destructive",
-                });
-              }
-            });
+          playPromise.catch(err => {
+            console.error("Error playing audio:", err);
+            
+            // On iOS, try to initialize the audio context again
+            if (err.name === 'NotAllowedError') {
+              // We don't show a toast here as we're already using the oscillator fallback
+            }
+          });
         }
       } catch (error) {
         console.error("Error scheduling note:", error);

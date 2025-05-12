@@ -8,6 +8,7 @@ export const useAudioContext = () => {
   const gainNodeRef = useRef<GainNode | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const audioInitializedRef = useRef<boolean>(false);
   const { toast } = useToast();
 
   const initAudio = () => {
@@ -26,6 +27,7 @@ export const useAudioContext = () => {
         audioContext.current.resume();
       }
       
+      audioInitializedRef.current = true;
       return true;
     } catch (error) {
       console.error("Error initializing audio context:", error);
@@ -78,16 +80,37 @@ export const useAudioContext = () => {
         }
       };
       
-      // When the audio context is created, connect the audio source
-      const handleFirstInteraction = () => {
+      // Function to handle user interaction for iOS
+      const initializeAudioForIOS = () => {
+        // Initialize audio context on first interaction
         initAudio();
+        
+        // Only connect audio source after context is created
         connectAudioSource();
-        document.removeEventListener('click', handleFirstInteraction);
-        document.removeEventListener('touchstart', handleFirstInteraction);
+        
+        // Remove event listeners once initialized
+        document.removeEventListener('click', initializeAudioForIOS);
+        document.removeEventListener('touchstart', initializeAudioForIOS);
+        document.removeEventListener('touchend', initializeAudioForIOS);
+        
+        // Play and immediately pause to initialize audio (iOS trick)
+        if (audioElementRef.current) {
+          audioElementRef.current.play()
+            .then(() => {
+              audioElementRef.current?.pause();
+              audioElementRef.current!.currentTime = 0;
+              console.log("Audio initialized successfully on iOS");
+            })
+            .catch(err => {
+              console.warn("Could not initialize audio:", err);
+            });
+        }
       };
       
-      document.addEventListener('click', handleFirstInteraction);
-      document.addEventListener('touchstart', handleFirstInteraction);
+      // Add multiple event listeners for iOS
+      document.addEventListener('click', initializeAudioForIOS);
+      document.addEventListener('touchstart', initializeAudioForIOS);
+      document.addEventListener('touchend', initializeAudioForIOS);
       
       // Also try connecting when the audio can play through
       audioElementRef.current.addEventListener('canplaythrough', connectAudioSource);
@@ -106,6 +129,7 @@ export const useAudioContext = () => {
     audioElementRef,
     sourceNodeRef,
     initAudio,
-    ensureAudioContext
+    ensureAudioContext,
+    audioInitializedRef
   };
 };

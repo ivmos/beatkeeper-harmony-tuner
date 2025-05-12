@@ -18,19 +18,42 @@ export const useSoundType = (audioElementRef: React.MutableRefObject<HTMLAudioEl
   // Update the audio element source when sound type changes
   useEffect(() => {
     if (audioElementRef.current) {
-      // Create absolute URL for audio files
-      const baseUrl = window.location.origin;
-      const audioSrc = `${baseUrl}${CLICK_SOUNDS[soundType]}`;
-      
-      console.log("Setting audio source to:", audioSrc);
-      audioElementRef.current.src = audioSrc;
-      
-      // Important to load the new source
-      const loadPromise = audioElementRef.current.load();
-      if (loadPromise !== undefined) {
-        Promise.resolve(loadPromise).catch(err => {
-          console.error("Error loading audio source:", err);
-        });
+      try {
+        // Use base64 encoded sounds to avoid network requests
+        audioElementRef.current.src = CLICK_SOUNDS[soundType];
+        
+        console.log("Setting audio source to:", soundType);
+        
+        // Important to load the new source
+        const loadPromise = audioElementRef.current.load();
+        if (loadPromise !== undefined) {
+          Promise.resolve(loadPromise).catch(err => {
+            console.error("Error loading audio source:", err);
+          });
+        }
+        
+        // On iOS, we need to play and immediately pause to initialize audio
+        // This is done after a user interaction
+        const initializeAudioForIOS = () => {
+          if (audioElementRef.current) {
+            audioElementRef.current.play()
+              .then(() => {
+                // Successfully started playing, pause it immediately
+                audioElementRef.current?.pause();
+                audioElementRef.current!.currentTime = 0;
+              })
+              .catch(err => {
+                console.warn("Could not initialize audio:", err);
+                // No need to show error, as this is expected on first load
+              });
+          }
+          document.removeEventListener('click', initializeAudioForIOS);
+        };
+        
+        document.addEventListener('click', initializeAudioForIOS, { once: true });
+        
+      } catch (err) {
+        console.error("Error setting audio source:", err);
       }
     }
   }, [soundType, audioElementRef]);
