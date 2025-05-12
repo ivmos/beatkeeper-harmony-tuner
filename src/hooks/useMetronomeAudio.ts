@@ -42,8 +42,14 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
   // Schedule a beat sound
   const scheduleNote = () => {
     if (audioElementRef.current && gainNodeRef.current) {
-      // Play the audio element
+      // Reset audio position to start
       audioElementRef.current.currentTime = 0;
+      
+      // Make sure the audio element has a valid source
+      if (!audioElementRef.current.src) {
+        console.error("Audio element has no source!");
+        return;
+      }
       
       // This promise-based approach handles autoplay restrictions better
       const playPromise = audioElementRef.current.play();

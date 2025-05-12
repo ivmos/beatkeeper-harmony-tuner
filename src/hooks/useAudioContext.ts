@@ -19,17 +19,6 @@ export const useAudioContext = () => {
         // Create gain node
         gainNodeRef.current = audioContext.current.createGain();
         gainNodeRef.current.connect(audioContext.current.destination);
-        
-        // Connect audio element to the audio context
-        if (audioElementRef.current) {
-          try {
-            sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
-            sourceNodeRef.current.connect(gainNodeRef.current);
-          } catch (error) {
-            console.warn("Could not create media element source:", error);
-            // This might happen if the audio element is already connected
-          }
-        }
       }
       
       // Resume audio context if suspended (needed for iOS)
@@ -61,7 +50,7 @@ export const useAudioContext = () => {
     return true;
   };
 
-  // Initialize audio element for iOS background playback
+  // Initialize audio element
   useEffect(() => {
     if (!audioElementRef.current) {
       // Create a new audio element
@@ -72,8 +61,21 @@ export const useAudioContext = () => {
       // Set initial sound (default to sine)
       audioElementRef.current.src = CLICK_SOUNDS['sine'];
       
-      // Append to body for iOS background playback
+      // Add to body for iOS background playback
       document.body.appendChild(audioElementRef.current);
+      
+      // When the audio element is ready, connect it to the audio context
+      audioElementRef.current.addEventListener('canplaythrough', () => {
+        if (audioContext.current && !sourceNodeRef.current && audioElementRef.current) {
+          try {
+            sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
+            sourceNodeRef.current.connect(gainNodeRef.current!);
+          } catch (error) {
+            console.warn("Could not create media element source:", error);
+            // This might happen if the audio element is already connected
+          }
+        }
+      });
     }
     
     return () => {

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -8,15 +9,12 @@ import TapTempo from './TapTempo';
 import MetronomeStats from './MetronomeStats';
 import VolumeControl from './VolumeControl';
 import SoundSelector from './SoundSelector';
-import { useAudioContext } from '@/hooks/useAudioContext';
-import { useAudioVolume } from '@/hooks/useAudioVolume';
-import { useSoundType } from '@/hooks/useSoundType';
 import { useMetronomeTempo } from '@/hooks/useMetronomeTempo';
 import { useMetronomeSession } from '@/hooks/useMetronomeSession';
+import { useMetronomeAudio } from '@/hooks/useMetronomeAudio';
 
 const MetronomeControl: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentBeat, setCurrentBeat] = useState(0);
   
   // Use our custom hooks
   const {
@@ -29,100 +27,19 @@ const MetronomeControl: React.FC = () => {
     updateBpmFromTap
   } = useMetronomeTempo();
   
-  // Audio context management
-  const {
-    audioContext,
-    gainNodeRef,
-    audioElementRef,
-    sourceNodeRef,
-    ensureAudioContext
-  } = useAudioContext();
-  
-  // Volume control
-  const {
-    volume,
-    isMuted,
-    handleVolumeChange,
-    toggleMute
-  } = useAudioVolume(gainNodeRef);
-  
-  // Sound type selection
-  const {
-    soundType,
-    handleSoundTypeChange
-  } = useSoundType(audioElementRef);
-  
   // Track session stats
   useMetronomeSession({ isPlaying });
   
-  // Schedule the next beat
-  const intervalRef = React.useRef<number | null>(null);
-  
-  // Schedule a beat sound
-  const scheduleNote = React.useCallback(() => {
-    if (audioElementRef.current && gainNodeRef.current) {
-      // Play the audio element
-      audioElementRef.current.currentTime = 0;
-      
-      // This promise-based approach handles autoplay restrictions better
-      const playPromise = audioElementRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.catch(err => {
-          console.error("Error playing audio:", err);
-        });
-      }
-      
-      // Update beat counter
-      setCurrentBeat((prevBeat) => (prevBeat + 1) % 4);
-    }
-  }, [audioElementRef, gainNodeRef]);
-
-  // Start metronome loop
-  const startMetronome = React.useCallback(() => {
-    // Try to initialize audio context
-    if (!ensureAudioContext()) {
-      return;
-    }
-    
-    // Clear any existing interval
-    if (intervalRef.current) {
-      window.clearInterval(intervalRef.current);
-    }
-    
-    // Calculate interval time in milliseconds
-    const intervalTime = (60.0 / bpm) * 1000;
-    
-    // Start scheduler with precise timing
-    intervalRef.current = window.setInterval(scheduleNote, intervalTime);
-    
-    // Trigger first beat immediately
-    scheduleNote();
-  }, [bpm, ensureAudioContext, scheduleNote]);
-
-  // Stop metronome
-  const stopMetronome = React.useCallback(() => {
-    if (intervalRef.current) {
-      window.clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setCurrentBeat(0);
-  }, []);
-
-  // Update the metronome when isPlaying changes
-  React.useEffect(() => {
-    if (isPlaying) {
-      startMetronome();
-    } else {
-      stopMetronome();
-    }
-    
-    return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-      }
-    };
-  }, [isPlaying, bpm, startMetronome, stopMetronome]);
+  // Audio management
+  const {
+    currentBeat,
+    volume,
+    isMuted,
+    soundType,
+    handleVolumeChange,
+    toggleMute,
+    handleSoundTypeChange
+  } = useMetronomeAudio({ bpm, isPlaying });
   
   // Toggle play/pause
   const togglePlayPause = () => {
@@ -191,9 +108,6 @@ const MetronomeControl: React.FC = () => {
           onToggleMute={toggleMute} 
         />
       </div>
-      
-      {/* Hidden audio element for iOS background playback */}
-      <audio id="metronome-audio" preload="auto" style={{ display: 'none' }} />
     </div>
   );
 };
