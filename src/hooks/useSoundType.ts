@@ -18,8 +18,12 @@ export const useSoundType = (audioElementRef: React.MutableRefObject<HTMLAudioEl
   // Update the audio element source when sound type changes
   useEffect(() => {
     if (audioElementRef.current) {
-      console.log("Setting audio source to:", CLICK_SOUNDS[soundType]);
-      audioElementRef.current.src = CLICK_SOUNDS[soundType];
+      // Create absolute URL for audio files
+      const baseUrl = window.location.origin;
+      const audioSrc = `${baseUrl}${CLICK_SOUNDS[soundType]}`;
+      
+      console.log("Setting audio source to:", audioSrc);
+      audioElementRef.current.src = audioSrc;
       
       // Important to load the new source
       const loadPromise = audioElementRef.current.load();

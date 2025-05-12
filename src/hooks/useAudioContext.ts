@@ -58,51 +58,45 @@ export const useAudioContext = () => {
       audioElementRef.current.loop = false;
       audioElementRef.current.preload = "auto";
       
-      // Set initial sound (default to sine)
+      // Set initial sound using the base64 encoded fallback
       audioElementRef.current.src = CLICK_SOUNDS['sine'];
       
-      // Add to body for iOS background playback
-      document.body.appendChild(audioElementRef.current);
-      
-      // When the audio element is ready, connect it to the audio context
-      audioElementRef.current.addEventListener('canplaythrough', () => {
-        if (audioContext.current && !sourceNodeRef.current && audioElementRef.current) {
+      const connectAudioSource = () => {
+        if (audioContext.current && audioElementRef.current && !sourceNodeRef.current) {
           try {
+            // Initialize audio context if not already done
+            ensureAudioContext();
+            
+            // Create and connect source node
             sourceNodeRef.current = audioContext.current.createMediaElementSource(audioElementRef.current);
             sourceNodeRef.current.connect(gainNodeRef.current!);
+            
+            console.log("Audio source successfully connected");
           } catch (error) {
             console.warn("Could not create media element source:", error);
-            // This might happen if the audio element is already connected
           }
         }
-      });
+      };
+      
+      // When the audio context is created, connect the audio source
+      const handleFirstInteraction = () => {
+        initAudio();
+        connectAudioSource();
+        document.removeEventListener('click', handleFirstInteraction);
+        document.removeEventListener('touchstart', handleFirstInteraction);
+      };
+      
+      document.addEventListener('click', handleFirstInteraction);
+      document.addEventListener('touchstart', handleFirstInteraction);
+      
+      // Also try connecting when the audio can play through
+      audioElementRef.current.addEventListener('canplaythrough', connectAudioSource);
     }
     
     return () => {
       if (audioContext.current) {
         audioContext.current.close();
       }
-      
-      if (audioElementRef.current && audioElementRef.current.parentNode) {
-        document.body.removeChild(audioElementRef.current);
-      }
-    };
-  }, []);
-
-  // Initialize audio context on first interaction
-  useEffect(() => {
-    const handleFirstInteraction = () => {
-      initAudio();
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('touchstart', handleFirstInteraction);
-    };
-
-    document.addEventListener('click', handleFirstInteraction);
-    document.addEventListener('touchstart', handleFirstInteraction);
-
-    return () => {
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('touchstart', handleFirstInteraction);
     };
   }, []);
 

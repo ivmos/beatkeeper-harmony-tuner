@@ -41,36 +41,52 @@ export const useMetronomeAudio = ({ bpm, isPlaying }: UseMetronomeAudioProps) =>
 
   // Schedule a beat sound
   const scheduleNote = () => {
-    if (audioElementRef.current && gainNodeRef.current) {
-      // Reset audio position to start
-      audioElementRef.current.currentTime = 0;
-      
-      // Make sure the audio element has a valid source
-      if (!audioElementRef.current.src) {
-        console.error("Audio element has no source!");
-        return;
-      }
-      
-      // This promise-based approach handles autoplay restrictions better
-      const playPromise = audioElementRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            // Playback started successfully
-          })
-          .catch(err => {
-            console.error("Error playing audio:", err);
-            
-            // Try to handle browser autoplay policy
-            if (err.name === 'NotAllowedError') {
-              toast({
-                title: "Audio Playback Blocked",
-                description: "Please interact with the page to enable sound",
-                variant: "destructive",
-              });
-            }
-          });
+    if (audioElementRef.current) {
+      try {
+        // Reset audio position to start
+        audioElementRef.current.currentTime = 0;
+        
+        // Make sure the audio element has a valid source
+        if (!audioElementRef.current.src) {
+          console.error("Audio element has no source!");
+          return;
+        }
+        
+        // Directly create an oscillator for instant sound if the audio element fails
+        if (audioContext.current && gainNodeRef.current) {
+          const oscillator = audioContext.current.createOscillator();
+          oscillator.type = soundType as OscillatorType;
+          oscillator.frequency.setValueAtTime(880, audioContext.current.currentTime);
+          
+          oscillator.connect(gainNodeRef.current);
+          oscillator.start();
+          oscillator.stop(audioContext.current.currentTime + 0.05);
+        }
+        
+        // Also try the audio element approach
+        const playPromise = audioElementRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              // Playback started successfully
+              console.log("Audio played successfully");
+            })
+            .catch(err => {
+              console.error("Error playing audio:", err);
+              
+              // Try to handle browser autoplay policy
+              if (err.name === 'NotAllowedError') {
+                toast({
+                  title: "Audio Playback Blocked",
+                  description: "Please interact with the page to enable sound",
+                  variant: "destructive",
+                });
+              }
+            });
+        }
+      } catch (error) {
+        console.error("Error scheduling note:", error);
       }
       
       // Update beat counter
